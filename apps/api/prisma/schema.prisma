@@ -1,0 +1,187 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MailboxSyncStatus {
+  idle
+  syncing
+  error
+  needs_reauth
+}
+
+enum SyncJobType {
+  full
+  incremental
+}
+
+enum SyncJobStatus {
+  queued
+  running
+  completed
+  failed
+}
+
+enum BulkActionType {
+  trash
+}
+
+enum BulkActionStatus {
+  pending_confirmation
+  confirmed
+  in_progress
+  completed
+  completed_with_errors
+  failed
+  cancelled
+}
+
+enum BulkActionMessageStatus {
+  pending
+  succeeded
+  failed
+}
+
+model User {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  googleSub   String   @unique @map("google_sub")
+  displayName String?  @map("display_name")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  mailboxAccounts MailboxAccount[]
+  bulkActions     BulkAction[]
+
+  @@map("users")
+}
+
+model MailboxAccount {
+  id            String            @id @default(uuid())
+  userId        String            @map("user_id")
+  gmailAddress  String            @map("gmail_address")
+  syncStatus    MailboxSyncStatus @default(idle) @map("sync_status")
+  syncError     String?           @map("sync_error")
+  historyId     String?           @map("history_id")
+  lastSyncedAt  DateTime?         @map("last_synced_at")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  oauthToken  OAuthToken?
+  messages    Message[]
+  senders     Sender[]
+  syncJobs    SyncJob[]
+  bulkActions BulkAction[]
+
+  @@unique([userId, gmailAddress])
+  @@map("mailbox_accounts")
+}
+
+model OAuthToken {
+  id                     String   @id @default(uuid())
+  mailboxAccountId       String   @unique @map("mailbox_account_id")
+  encryptedRefreshToken  String   @map("encrypted_refresh_token")
+  encryptedAccessToken   String?  @map("encrypted_access_token")
+  accessTokenExpiresAt   DateTime? @map("access_token_expires_at")
+  scopes                 String[]
+  encKeyVersion          Int      @default(1) @map("enc_key_version")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  mailboxAccount MailboxAccount @relation(fields: [mailboxAccountId], references: [id], onDelete: Cascade)
+
+  @@map("oauth_tokens")
+}
+
+model Message {
+  id               String   @id // Gmail message id
+  mailboxAccountId String   @map("mailbox_account_id")
+  threadId         String   @map("thread_id")
+  senderEmail      String   @map("sender_email")
+  senderName       String?  @map("sender_name")
+  subject          String?
+  internalDate     DateTime @map("internal_date")
+  isUnread         Boolean  @default(false) @map("is_unread")
+  labelIds         String[] @map("label_ids")
+  sizeEstimate     Int?     @map("size_estimate")
+  syncedAt         DateTime @default(now()) @map("synced_at")
+
+  mailboxAccount MailboxAccount @relation(fields: [mailboxAccountId], references: [id], onDelete: Cascade)
+
+  @@index([mailboxAccountId, senderEmail])
+  @@map("messages")
+}
+
+model Sender {
+  id               String    @id @default(uuid())
+  mailboxAccountId String    @map("mailbox_account_id")
+  emailAddress     String    @map("email_address")
+  displayName      String?   @map("display_name")
+  messageCount     Int       @default(0) @map("message_count")
+  unreadCount      Int       @default(0) @map("unread_count")
+  firstMessageAt   DateTime? @map("first_message_at")
+  lastMessageAt    DateTime? @map("last_message_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  mailboxAccount MailboxAccount @relation(fields: [mailboxAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([mailboxAccountId, emailAddress])
+  @@index([mailboxAccountId, messageCount])
+  @@map("senders")
+}
+
+model SyncJob {
+  id               String        @id @default(uuid())
+  mailboxAccountId String        @map("mailbox_account_id")
+  type             SyncJobType
+  status           SyncJobStatus @default(queued)
+  cursor           String?
+  startedAt        DateTime?     @map("started_at")
+  finishedAt       DateTime?     @map("finished_at")
+  error            String?
+  stats            Json?
+  createdAt        DateTime      @default(now()) @map("created_at")
+
+  mailboxAccount MailboxAccount @relation(fields: [mailboxAccountId], references: [id], onDelete: Cascade)
+
+  @@index([mailboxAccountId, createdAt])
+  @@map("sync_jobs")
+}
+
+model BulkAction {
+  id                  String            @id @default(uuid())
+  mailboxAccountId    String            @map("mailbox_account_id")
+  userId              String            @map("user_id")
+  actionType          BulkActionType    @map("action_type")
+  senderEmail         String            @map("sender_email")
+  targetMessageCount  Int               @map("target_message_count")
+  status              BulkActionStatus  @default(pending_confirmation)
+  requestedAt         DateTime          @default(now()) @map("requested_at")
+  confirmedAt         DateTime?         @map("confirmed_at")
+  completedAt         DateTime?         @map("completed_at")
+
+  mailboxAccount MailboxAccount      @relation(fields: [mailboxAccountId], references: [id], onDelete: Cascade)
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages       BulkActionMessage[]
+
+  @@index([mailboxAccountId, requestedAt])
+  @@map("bulk_actions")
+}
+
+model BulkActionMessage {
+  id           String                   @id @default(uuid())
+  bulkActionId String                   @map("bulk_action_id")
+  messageId    String                   @map("message_id")
+  status       BulkActionMessageStatus  @default(pending)
+  error        String?
+
+  bulkAction BulkAction @relation(fields: [bulkActionId], references: [id], onDelete: Cascade)
+
+  @@unique([bulkActionId, messageId])
+  @@map("bulk_action_messages")
+}

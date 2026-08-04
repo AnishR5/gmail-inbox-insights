@@ -1,0 +1,45 @@
+/*
+ * Reference palette from the dataviz skill, used verbatim. Categorical order
+ * is fixed (never cycled/reassigned) — slot 1 is always the first series
+ * assigned, etc. darkMode is "media" in this app (no manual toggle), so only
+ * the prefers-color-scheme branch is needed.
+ */
+.viz-root {
+  color-scheme: light;
+  --viz-surface: #fcfcfb;
+  --viz-ink-primary: #0b0b0b;
+  --viz-ink-secondary: #52514e;
+  --viz-ink-muted: #898781;
+  --viz-gridline: #e1e0d9;
+  --viz-baseline: #c3c2b7;
+
+  --viz-series-1: #2a78d6; /* blue */
+  --viz-series-2: #eb6834; /* orange */
+  --viz-series-3: #1baf7a; /* aqua */
+  --viz-series-4: #eda100; /* yellow */
+  --viz-series-5: #e87ba4; /* magenta */
+  --viz-series-6: #4a3aa7; /* violet */
+
+  --viz-status-warning: #fab219;
+}
+
+@media (prefers-color-scheme: dark) {
+  .viz-root {
+    color-scheme: dark;
+    --viz-surface: #1a1a19;
+    --viz-ink-primary: #ffffff;
+    --viz-ink-secondary: #c3c2b7;
+    --viz-ink-muted: #898781;
+    --viz-gridline: #2c2c2a;
+    --viz-baseline: #383835;
+
+    --viz-series-1: #3987e5;
+    --viz-series-2: #d95926;
+    --viz-series-3: #199e70;
+    --viz-series-4: #c98500;
+    --viz-series-5: #d55181;
+    --viz-series-6: #9085e9;
+
+    --viz-status-warning: #fab219;
+  }
+}
