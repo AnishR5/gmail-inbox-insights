@@ -18,13 +18,22 @@ Browser
         └── Upstash (free)                 Redis
 ```
 
-**The tradeoff you're accepting for $0/mo**: App Service's Free tier doesn't
-support "Always On" — the app can idle-unload after ~20 min with no HTTP
-traffic. The first visitor after a quiet spell waits ~10-30s for it to wake
-up, and the 30-minute auto-sync scheduler only actually fires on the next
-incoming request rather than exactly on schedule while asleep. Fine for a
-portfolio/demo link; upgrade to Basic B1 (~$13/mo) later if you want it
-always-on.
+**The tradeoff you're accepting for $0/mo**: App Service's Free (F1) tier caps
+usage at **60 CPU-minutes/day**, and once that's hit the platform force-stops
+the app entirely (Portal shows **Status: Quota exceeded**, visitors get a
+`403 - This web app is stopped`) until the quota resets — you have to go into
+the Portal and click **Start** to bring it back. F1 also doesn't support
+"Always On", so even short of the quota, the app can idle-unload after ~20
+min with no traffic and the next visitor eats a ~10-30s cold start.
+
+**This isn't just a cold-start inconvenience** — confirmed in practice, not
+just theoretical: this app runs continuous background workers (BullMQ
+processing, the 30-minute auto-sync scheduler) even with zero visitors, so
+the daily quota can get exhausted from background activity alone, not only
+from traffic. Expect to periodically find it stopped and need to manually
+restart it in the Portal. Upgrade to Basic B1 (~$13/mo) if/when that gets
+old — it removes the quota entirely and enables Always On, no code changes
+needed, just a plan change under App Service Plan → Scale up.
 
 **Order matters below** — the API needs to exist before you can point the
 frontend's build at it, and the API's `WEB_ORIGIN` setting needs the
@@ -61,7 +70,7 @@ Save both somewhere safe (password manager) — you'll paste them into Azure in 
 
 1. [portal.azure.com](https://portal.azure.com) → Create a resource → **Web App**.
 2. Resource Group: create new (e.g. `gmail-insights-rg`).
-3. Name: globally unique (e.g. `gmail-inbox-insights-api`) — your URL will be `https://<name>.azurewebsites.net`.
+3. Name: globally unique (e.g. `gmail-inbox-insights-api`). Azure sometimes assigns a longer **default domain** than the simple `https://<name>.azurewebsites.net` pattern — e.g. `https://<name>-<random>.<region>.azurewebsites.net`. **Use whatever the Portal's Overview page actually shows under "Default domain" for every URL below** — don't assume the short form.
 4. Publish: **Code**. Runtime stack: **Node 20 LTS**. OS: **Linux**.
 5. Pricing plan: create a new App Service Plan, SKU **Free F1**.
 6. Review + create.
@@ -151,3 +160,4 @@ Pushing triggers `.github/workflows/deploy-api.yml` (API → App Service) and th
 - **CORS errors in the browser console**: `WEB_ORIGIN` on the API doesn't exactly match the SWA URL (check for trailing slash / http vs https).
 - **App Service shows "Application Error"**: check **Log stream** in the Portal; most likely a missing/wrong Application Setting, or the startup command's `prisma migrate deploy` failing (bad `DATABASE_URL`).
 - **Google's OAuth screen says access blocked**: that account isn't in the Test users list (step 6.3).
+- **API returns `403 - This web app is stopped` / Portal shows Status: Quota exceeded**: F1's 60 CPU-min/day quota is used up (see the tradeoff note above — this app's background workers alone can trigger it). Go to the App Service Overview page and click **Start**. If it immediately stops again, the quota hasn't reset yet — wait, or upgrade to Basic B1.
