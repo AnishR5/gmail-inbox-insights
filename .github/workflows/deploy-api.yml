@@ -19,10 +19,18 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Install dependencies (workspace root)
         run: npm ci
+
+      # Don't rely on @prisma/client's postinstall hook to do this — it
+      # isn't reliably running in a fresh CI checkout, which left a
+      # stale/missing generated client and broke the TypeScript build with
+      # a cascade of "implicit any" errors on anything touching Prisma
+      # query results (reproduced and confirmed locally).
+      - name: Generate Prisma Client
+        run: npx prisma generate --schema=apps/api/prisma/schema.prisma
 
       - name: Build shared package and API
         run: |
