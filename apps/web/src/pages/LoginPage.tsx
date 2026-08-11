@@ -1,4 +1,4 @@
-import { InboxStackIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
+import { InboxStackIcon, InformationCircleIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
 import { api } from "../api/client";
 
 export default function LoginPage() {
@@ -29,6 +29,12 @@ export default function LoginPage() {
           We only request read access to scan your mail. We'll ask separately, only when you choose to
           move messages to trash.
         </p>
+
+        <div className="mt-3 flex items-start gap-1.5 rounded-md bg-amber-50 p-2.5 text-left text-xs leading-relaxed text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+          <InformationCircleIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          This app is in limited testing — only approved Google accounts can sign in right now. Message
+          me for access if you'd like to try it.
+        </div>
       </div>
     </div>
   );

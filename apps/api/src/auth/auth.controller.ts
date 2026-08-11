@@ -29,7 +29,11 @@ export class AuthController {
     res.cookie(PKCE_COOKIE, verifier, {
       httpOnly: true,
       secure: isProd,
-      sameSite: "lax",
+      // SameSite=None (required for cross-origin fetch/XHR once frontend and
+      // API are on different domains in prod) needs Secure — hence tied to
+      // isProd rather than always "lax", which browsers won't send on
+      // cross-site subrequests even though it's fine for the OAuth redirects.
+      sameSite: isProd ? "none" : "lax",
       maxAge: 10 * 60 * 1000,
       path: "/auth/google",
     });
@@ -45,7 +49,11 @@ export class AuthController {
     res.cookie(PKCE_COOKIE, verifier, {
       httpOnly: true,
       secure: isProd,
-      sameSite: "lax",
+      // SameSite=None (required for cross-origin fetch/XHR once frontend and
+      // API are on different domains in prod) needs Secure — hence tied to
+      // isProd rather than always "lax", which browsers won't send on
+      // cross-site subrequests even though it's fine for the OAuth redirects.
+      sameSite: isProd ? "none" : "lax",
       maxAge: 10 * 60 * 1000,
       path: "/auth/google",
     });
@@ -75,7 +83,7 @@ export class AuthController {
     if (!verifier) {
       throw new BadRequestException("Missing PKCE verifier cookie — please restart the login flow");
     }
-    res.clearCookie(PKCE_COOKIE, { path: "/auth/google" });
+    res.clearCookie(PKCE_COOKIE, { path: "/auth/google", secure: isProd, sameSite: isProd ? "none" : "lax" });
 
     const tokens = await this.google.exchangeCode(code, verifier);
 
@@ -93,7 +101,7 @@ export class AuthController {
     res.cookie("session", session, {
       httpOnly: true,
       secure: isProd,
-      sameSite: "lax",
+      sameSite: isProd ? "none" : "lax",
       maxAge: this.sessions.sessionCookieMaxAgeMs,
       path: "/",
     });
@@ -102,7 +110,9 @@ export class AuthController {
 
   @Post("logout")
   async logout(@Res() res: Response) {
-    res.clearCookie("session", { path: "/" });
+    // Must match the attributes the cookie was set with (secure/sameSite),
+    // or the clearing Set-Cookie can fail to overwrite it cross-origin.
+    res.clearCookie("session", { path: "/", secure: isProd, sameSite: isProd ? "none" : "lax" });
     res.status(200).json({ ok: true });
   }
 

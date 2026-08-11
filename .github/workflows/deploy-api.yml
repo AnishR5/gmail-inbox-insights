@@ -1,0 +1,58 @@
+name: Deploy API to Azure App Service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/api/**"
+      - "packages/shared/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/deploy-api.yml"
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies (workspace root)
+        run: npm ci
+
+      - name: Build shared package and API
+        run: |
+          npm run build --workspace=packages/shared
+          npm run build --workspace=apps/api
+
+      # Azure App Service just needs `node apps/api/dist/main.js` runnable
+      # from the deployed root. npm workspaces hoist most deps into the root
+      # node_modules (with @gmail-insights/shared symlinked in from
+      # packages/shared, not published to any registry), so the artifact has
+      # to preserve that layout rather than flattening apps/api into its own
+      # standalone folder — a plain `npm install` outside the workspace has
+      # no way to resolve an unpublished workspace package.
+      - name: Assemble deploy package
+        run: |
+          mkdir -p deploy/apps/api deploy/packages/shared
+          cp -r node_modules deploy/node_modules
+          cp package.json package-lock.json deploy/
+          cp -r packages/shared/dist deploy/packages/shared/dist
+          cp packages/shared/package.json deploy/packages/shared/package.json
+          cp -r apps/api/dist deploy/apps/api/dist
+          cp apps/api/package.json deploy/apps/api/package.json
+          cp -r apps/api/prisma deploy/apps/api/prisma
+
+      - name: Zip artifact
+        run: cd deploy && zip -qr ../release.zip .
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: release.zip

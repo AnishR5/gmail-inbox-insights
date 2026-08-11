@@ -23,7 +23,9 @@ async function bootstrap() {
     credentials: true,
   });
 
-  const port = process.env.API_PORT ?? 4000;
+  // Most PaaS hosts (Azure App Service, Render, Heroku, ...) inject PORT and
+  // expect the app to bind to it; API_PORT is our own local-dev override.
+  const port = process.env.PORT ?? process.env.API_PORT ?? 4000;
   await app.listen(port);
   // eslint-disable-next-line no-console
   console.log(`API listening on http://localhost:${port}`);
