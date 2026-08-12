@@ -93,8 +93,23 @@ Once it exists, configure it:
 
 **Configuration → General settings → Startup Command**:
 ```
-sh -c "npx prisma migrate deploy --schema=apps/api/prisma/schema.prisma && node apps/api/dist/main.js"
+node apps/api/dist/main.js
 ```
+
+Run migrations separately, from your own machine, against the production
+`DATABASE_URL` — **not** chained into the Azure startup command. In practice
+`npx prisma migrate deploy` at Azure App Service startup resolves an
+incomplete/misresolved Prisma CLI (it falls back to a live npm registry
+fetch, then crashes on a missing `prisma_schema_build_bg.wasm`), which turns
+every single container start into a crash — and each crash-restart burns
+real CPU against the Free tier's 60-min/day quota, so a flaky migration step
+here doesn't just fail once, it can eat your whole day's quota:
+```bash
+cd apps/api
+DATABASE_URL="<your prod DATABASE_URL>" npx prisma migrate deploy --schema=prisma/schema.prisma
+```
+Do this once now, and again after any future change to `prisma/schema.prisma`
+before deploying that change.
 
 **Overview → Get publish profile** — downloads a `.PublishSettings` file. Open it, copy the entire contents.
 
