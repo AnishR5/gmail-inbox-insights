@@ -11,7 +11,12 @@ import {
 } from "../queues";
 import { INCREMENTAL_SYNC_QUEUE, SYNC_SCHEDULER_QUEUE } from "../sync-queues.module";
 
-const SCHEDULER_INTERVAL_MS = 30 * 60 * 1000;
+// Widened from 30 minutes: on Azure App Service Free F1 (60 CPU-min/day
+// quota, no Always On), this app's background workers are themselves a
+// meaningful source of ongoing CPU load — 48 sync cycles/day at 30min adds
+// up fast even with zero visitors. Users can always trigger "Quick sync"
+// manually from the dashboard for on-demand freshness.
+const SCHEDULER_INTERVAL_MS = 3 * 60 * 60 * 1000;
 const SCHEDULER_TICK_JOB_ID = "sync-scheduler-tick";
 const IN_FLIGHT_SYNC_STATUSES = ["queued", "running"] as const;
 
