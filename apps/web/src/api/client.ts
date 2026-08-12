@@ -12,7 +12,10 @@ import type {
   VolumeInsightsResponse,
 } from "@gmail-insights/shared";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000";
+// Strip any trailing slash so a misconfigured env var (with or without one)
+// can't produce a double-slash when concatenated with a leading-slash path
+// below — some frameworks treat "//auth/..." as a distinct, non-matching route.
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000").replace(/\/+$/, "");
 
 export class ApiError extends Error {
   constructor(
